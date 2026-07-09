@@ -1,8 +1,4 @@
-outreach.db
-outreach.db-wal
-outreach.db-shm
 drafts.md
-queue.xlsx
 __pycache__/
 *.pyc
 .venv/

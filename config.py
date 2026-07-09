@@ -2,23 +2,18 @@
 
 This package NEVER sends anything. It prepares messages for a human to read and
 paste. There is no SMTP client, no API key, and no --send flag anywhere in it.
+
+All lead state lives in the ONE master workbook, Projects/leads_master.xlsx.
 """
 
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECTS_DIR = os.path.dirname(BASE_DIR)
 
-# Lead sources (read-only; we never write into the scraper repos).
-SCRAPER_OUTPUT_DIR = os.path.join(PROJECTS_DIR, "scraper", "output")
-SCRAPER3_OUTPUT_DIR = os.path.join(PROJECTS_DIR, "scraper3", "output")
-SCRAPER_GLOB = "delhi_ncr_leads_*.csv"
-SCRAPER3_GLOB = "delhi_ncr_instagram_leads_*.csv"
-
-# Outputs.
-LEDGER_DB = os.path.join(BASE_DIR, "outreach.db")
+# Leads are read from, and written back to, Projects/leads_master.xlsx — see
+# master_registry.py. There is no database and no queue file here.
+# The only artifact this repo produces is a human-readable copy of the drafts.
 DRAFTS_FILE = os.path.join(BASE_DIR, "drafts.md")
-QUEUE_XLSX = os.path.join(BASE_DIR, "queue.xlsx")
 
 CHANNEL_EMAIL = "email"
 CHANNEL_INSTAGRAM = "instagram"
