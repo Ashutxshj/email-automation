@@ -24,6 +24,7 @@ _DEFAULT = os.path.join(
 MASTER_FILE = os.getenv("MASTER_FILE", _DEFAULT)
 
 BULLETS_COLUMN = "Bullet points about this business which email automation can used"
+WHATSAPP_LINK_COLUMN = "WhatsApp Link"
 
 COLUMNS = [
     "Business Name",
@@ -32,6 +33,7 @@ COLUMNS = [
     "First Reported At",
     "Has_Website",
     "Phone Number",
+    WHATSAPP_LINK_COLUMN,   # derived from Phone Number; clickable wa.me link
     "Email Address",
     "Instagram",
     "Rating",
@@ -45,8 +47,10 @@ COLUMNS = [
                  # know about is simply ignored (upsert fills it with "").
 ]
 
-# Written by a scraper, never by email-automation.
-SOURCE_COLUMNS = COLUMNS[:11]
+# Written by a scraper, never by email-automation. (The WhatsApp link is
+# derived, not scraped, but upsert() fills it at append time so it travels
+# with the scraper-owned data.)
+SOURCE_COLUMNS = COLUMNS[:12]
 # Written by email-automation, never by a scraper.
 OUTREACH_COLUMNS = ["Message", "Reached", "Do Not Contact", "Channel"]
 
@@ -60,6 +64,20 @@ LEAD_TYPE_STALE_SITE = "Stale Website"
 def norm_phone(phone) -> str:
     digits = re.sub(r"\D", "", str(phone or ""))
     return digits[-10:] if len(digits) >= 10 else digits
+
+
+def whatsapp_link(phone) -> str:
+    """Clickable chat link for a phone, '' if the number is unusable.
+
+    wa.me needs the country code. Numbers stored with one keep it; bare
+    10-digit numbers get 91 — every lead is Delhi NCR by construction.
+    """
+    digits = re.sub(r"\D", "", str(phone or ""))
+    if len(digits) < 10:
+        return ""
+    if len(digits) == 10:
+        digits = "91" + digits
+    return f"https://wa.me/{digits}"
 
 
 def norm_handle(handle) -> str:
@@ -241,7 +259,7 @@ def upsert(rows: list[dict]) -> int:
     try:
         from openpyxl.styles import Alignment
         wb, ws = _open()
-        header = [str(c.value) for c in ws[1]]
+        header = _ensure_whatsapp_column(ws)
         existing: set[str] = set()
         for values in ws.iter_rows(min_row=2, values_only=True):
             existing |= identity_keys(_row_dict(header, values))
@@ -258,7 +276,14 @@ def upsert(rows: list[dict]) -> int:
             record.setdefault("Message", "")
             record.setdefault("Reached", False)
             record.setdefault("Do Not Contact", False)
+            record.setdefault(WHATSAPP_LINK_COLUMN,
+                              whatsapp_link(record.get("Phone Number")))
             ws.append([record.get(col, "") for col in header])
+            link = record.get(WHATSAPP_LINK_COLUMN)
+            if link and WHATSAPP_LINK_COLUMN in header:
+                _link_cell(ws.cell(row=ws.max_row,
+                                   column=header.index(WHATSAPP_LINK_COLUMN) + 1),
+                           link)
             for col in (BULLETS_COLUMN, "Message"):
                 if col in header:
                     ws.cell(row=ws.max_row, column=header.index(col) + 1).alignment = \
@@ -269,6 +294,59 @@ def upsert(rows: list[dict]) -> int:
     except Exception as exc:
         print(f"[master] WARN: could not update {MASTER_FILE}: {exc}")
         return 0
+
+
+def _link_cell(cell, link: str) -> None:
+    """openpyxl-written text is never auto-linked by Excel; attach a real
+    hyperlink so the cell is clickable."""
+    cell.value = link
+    cell.hyperlink = link
+    cell.style = "Hyperlink"
+
+
+def _ensure_whatsapp_column(ws) -> list[str]:
+    """Header as stored, inserting the WhatsApp Link column immediately right
+    of Phone Number if this workbook predates it. Safe for older copies of
+    this file: they map every read/write through the stored header."""
+    from openpyxl.styles import Font
+    from openpyxl.utils import get_column_letter
+    header = [str(c.value) for c in ws[1] if c.value is not None]
+    if WHATSAPP_LINK_COLUMN in header:
+        return header
+    pos = (header.index("Phone Number") + 2 if "Phone Number" in header
+           else len(header) + 1)
+    ws.insert_cols(pos)
+    cell = ws.cell(row=1, column=pos, value=WHATSAPP_LINK_COLUMN)
+    cell.font = Font(bold=True)
+    ws.column_dimensions[get_column_letter(pos)].width = 26
+    return [str(c.value) for c in ws[1] if c.value is not None]
+
+
+def ensure_whatsapp_links() -> int:
+    """Backfill: add the WhatsApp Link column and fill it for every row that
+    has a phone but no link yet. Idempotent; returns how many links were
+    written. upsert() keeps new rows filled from here on."""
+    if not os.path.exists(MASTER_FILE):
+        return 0
+    wb, ws = _open()
+    had_column = WHATSAPP_LINK_COLUMN in [str(c.value) for c in ws[1]
+                                          if c.value is not None]
+    header = _ensure_whatsapp_column(ws)
+    link_col = header.index(WHATSAPP_LINK_COLUMN) + 1
+    phone_col = header.index("Phone Number") + 1
+    written = 0
+    for excel_row in range(2, ws.max_row + 1):
+        cell = ws.cell(row=excel_row, column=link_col)
+        if cell.value:
+            continue
+        link = whatsapp_link(ws.cell(row=excel_row, column=phone_col).value)
+        if not link:
+            continue
+        _link_cell(cell, link)
+        written += 1
+    if written or not had_column:
+        wb.save(MASTER_FILE)
+    return written
 
 
 def _ensure_outreach_columns(ws) -> list[str]:

@@ -40,6 +40,10 @@ from ledger import Ledger
 
 def cmd_prep(limit: int, no_llm: bool = False, redraft: bool = False,
              mock_llm: bool = False) -> int:
+    links = master_registry.ensure_whatsapp_links()
+    if links:
+        print(f"[leads] {links} WhatsApp links filled in")
+
     all_leads, rejected = leads_mod.load_all()
     print(f"[leads] {len(all_leads)} contactable leads in {master_registry.MASTER_FILE}")
     print(f"[leads] {len(rejected)} rejected before drafting")
@@ -137,6 +141,9 @@ def _write_drafts_md(drafted, held, skipped) -> None:
             lines.append(f"### {lead.business}")
             if lead.channel == config.CHANNEL_WHATSAPP:
                 lines.append(f"- **To:** `{lead.phone or lead.identifier}` (WhatsApp)")
+                link = master_registry.whatsapp_link(lead.phone or lead.identifier)
+                if link:
+                    lines.append(f"- **Chat:** {link}")
             else:
                 lines.append(f"- **To:** `{lead.identifier}`")
             if subject:
