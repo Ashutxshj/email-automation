@@ -40,12 +40,15 @@ COLUMNS = [
     "Message",
     "Reached",
     "Do Not Contact",
+    "Channel",   # ALWAYS appended last: older copies of this file read the
+                 # header from the workbook, so a trailing column they don't
+                 # know about is simply ignored (upsert fills it with "").
 ]
 
 # Written by a scraper, never by email-automation.
 SOURCE_COLUMNS = COLUMNS[:11]
 # Written by email-automation, never by a scraper.
-OUTREACH_COLUMNS = ["Message", "Reached", "Do Not Contact"]
+OUTREACH_COLUMNS = ["Message", "Reached", "Do Not Contact", "Channel"]
 
 LEAD_TYPE_GOLDENROD = "Goldenrod"
 LEAD_TYPE_NEW_BARK = "New Bark"
@@ -87,12 +90,18 @@ def identity_keys(row: dict) -> set[str]:
 
 
 def matches(identifier: str, row: dict) -> bool:
-    """Does this row correspond to the email address or @handle given on the CLI?"""
+    """Does this row match the email address, @handle or phone given on the CLI?"""
     ident = str(identifier or "").strip().lower()
     if not ident:
         return False
     if "@" in ident and not ident.startswith("@"):
         return norm_email(row.get("Email Address")) == ident
+    # A phone-shaped identifier (only digits and phone punctuation, >= 10
+    # digits) is a WhatsApp lead. Handles can contain digits, so shape matters.
+    if not ident.startswith("@") and re.fullmatch(r"[\d\s()+\-]{10,}", ident):
+        digits = norm_phone(ident)
+        if len(digits) == 10:
+            return norm_phone(row.get("Phone Number")) == digits
     return norm_handle(row.get("Instagram")) == norm_handle(ident)
 
 
@@ -262,6 +271,20 @@ def upsert(rows: list[dict]) -> int:
         return 0
 
 
+def _ensure_outreach_columns(ws) -> list[str]:
+    """The header as stored, with any outreach column this copy knows about but
+    the workbook doesn't yet appended at the end. This is how a 14-column
+    workbook grows a Channel column without touching the scraper-owned ones."""
+    from openpyxl.styles import Font
+    header = [str(c.value) for c in ws[1] if c.value is not None]
+    for col in OUTREACH_COLUMNS:
+        if col not in header:
+            cell = ws.cell(row=1, column=len(header) + 1, value=col)
+            cell.font = Font(bold=True)
+            header.append(col)
+    return header
+
+
 def set_fields(identifier: str, **updates) -> bool:
     """Update one lead's outreach columns in place. True if a row was found."""
     bad = set(updates) - set(OUTREACH_COLUMNS)
@@ -272,7 +295,7 @@ def set_fields(identifier: str, **updates) -> bool:
 
     from openpyxl.styles import Alignment
     wb, ws = _open()
-    header = [str(c.value) for c in ws[1]]
+    header = _ensure_outreach_columns(ws)
     for excel_row in range(2, ws.max_row + 1):
         values = tuple(ws.cell(row=excel_row, column=i + 1).value
                        for i in range(len(header)))

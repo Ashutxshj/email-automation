@@ -1,9 +1,10 @@
 """Stage 4 — outreach state, stored in the ONE master workbook.
 
-There is no SQLite database and no queue.xlsx any more. Three columns in
+There is no SQLite database and no queue.xlsx any more. Four columns in
 Projects/leads_master.xlsx carry everything:
 
     Message         the drafted text, written here by --prep
+    Channel         where to paste it: Email / Instagram DM / WhatsApp (--prep)
     Reached         you sent it (set by --mark-sent)
     Do Not Contact  they asked you to stop (set by --suppress)
 
@@ -32,11 +33,38 @@ def _comparable(body: str) -> str:
     return " ".join(stripped.split()).lower()
 
 
+def _similarity(a: str, b: str) -> float:
+    """Symmetric SequenceMatcher ratio on comparable text.
+
+    autojunk MUST be off: with the default on, any character occurring in >1%
+    of a 200+-char string is treated as junk, which silently collapsed the
+    ratio for every email-length body — two near-identical emails scored ~0.08.
+    And ratio(a, b) != ratio(b, a) near the threshold, so whether a duplicate
+    was caught used to depend on which lead happened to be drafted first.
+    """
+    return max(
+        difflib.SequenceMatcher(None, a, b, autojunk=False).ratio(),
+        difflib.SequenceMatcher(None, b, a, autojunk=False).ratio(),
+    )
+
+
+def _opening(body: str) -> str:
+    """The first five comparable words, minus any embedded Subject line."""
+    text = str(body or "")
+    if text.startswith("Subject: "):
+        text = text.split("\n", 1)[1] if "\n" in text else ""
+    return " ".join(_comparable(text).split()[:5])
+
+
 def _identifier(row: dict) -> str:
+    """Same priority as leads.load_all: Instagram > email > phone (WhatsApp)."""
+    handle = str(row.get("Instagram") or "").strip()
+    if handle:
+        return handle
     email = master_registry.norm_email(row.get("Email Address"))
     if email:
         return email
-    return str(row.get("Instagram") or "").strip()
+    return master_registry.norm_phone(row.get("Phone Number"))
 
 
 class Ledger:
@@ -69,19 +97,40 @@ class Ledger:
         for identifier, prior in self._messages() + self._pending:
             if identifier.lower() == skip:
                 continue
-            ratio = difflib.SequenceMatcher(None, _comparable(prior), target).ratio()
+            ratio = _similarity(_comparable(prior), target)
             if best is None or ratio > best[1]:
                 best = (identifier, ratio)
         return best
+
+    def opening_clash(self, body: str, exclude: str = "") -> str | None:
+        """Identifier of an existing message sharing this body's first five
+        words, or None. Similarity alone misses this: business names and
+        numbers dilute a short one-liner below the threshold even when every
+        draft opens with the exact same hook."""
+        skip = str(exclude or "").strip().lower()
+        target = _opening(body)
+        if not target:
+            return None
+        for identifier, prior in self._messages() + self._pending:
+            if identifier.lower() == skip:
+                continue
+            if _opening(prior) == target:
+                return identifier
+        return None
 
     def stats(self) -> dict:
         rows = master_registry.load_rows()
         reached = [r for r in rows if master_registry.is_true(r.get("Reached"))]
         by_channel: dict[str, int] = {}
         for row in reached:
-            channel = (config.CHANNEL_EMAIL
-                       if master_registry.norm_email(row.get("Email Address"))
-                       else config.CHANNEL_INSTAGRAM)
+            channel = str(row.get("Channel") or "").strip()
+            if not channel:  # drafted before the Channel column existed: derive
+                if str(row.get("Instagram") or "").strip():
+                    channel = config.CHANNEL_LABELS[config.CHANNEL_INSTAGRAM]
+                elif master_registry.norm_email(row.get("Email Address")):
+                    channel = config.CHANNEL_LABELS[config.CHANNEL_EMAIL]
+                else:
+                    channel = config.CHANNEL_LABELS[config.CHANNEL_WHATSAPP]
             by_channel[channel] = by_channel.get(channel, 0) + 1
         return {
             "total": len(rows),
@@ -98,9 +147,12 @@ class Ledger:
         """Reserve a drafted body so later drafts in the same run must differ."""
         self._pending.append((identifier, body))
 
-    def save_draft(self, identifier: str, body: str) -> bool:
-        """Write the Message column. --prep owns this; nothing else writes it."""
-        return master_registry.set_fields(identifier, Message=body)
+    def save_draft(self, identifier: str, body: str, channel_label: str = "") -> bool:
+        """Write the Message (and Channel) columns. --prep owns these."""
+        updates = {"Message": body}
+        if channel_label:
+            updates["Channel"] = channel_label
+        return master_registry.set_fields(identifier, **updates)
 
     def mark_sent(self, identifier: str) -> bool:
         return master_registry.set_fields(identifier, Reached=True)

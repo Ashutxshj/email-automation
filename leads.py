@@ -4,10 +4,11 @@ never be contacted.
 Source: Projects/leads_master.xlsx (master_registry.py). Every scraper appends
 to it; nothing here writes the scraper-owned columns.
 
-Channel is derived, not stored:
-  * an Email Address  -> email  (Has_Website is TRUE, so pitch a redesign)
-  * else an Instagram -> DM     (no website, so pitch why having one helps)
-  * else               -> unreachable under our channels; skipped
+Channel is derived here (and recorded by --prep in the master's Channel column):
+  * an Instagram      -> DM        (one-line message, pasted by hand)
+  * else an Email     -> email     (proper short email)
+  * else a Phone      -> WhatsApp  (one-line message, pasted by hand)
+  * else               -> unreachable; skipped
 
 The purge is the single most important thing in this repo. /scraper's mock
 targets point at livspace.com, haldirams.com and clovedental.com; running it with
@@ -42,9 +43,10 @@ def clean_business(name: str) -> str:
 @dataclass
 class Lead:
     channel: str
-    identifier: str          # email address, or @handle
+    identifier: str          # email address, @handle, or 10-digit phone
     business: str
     category: str = ""
+    lead_type: str = ""      # Goldenrod / New Bark / Stale Website
     domain: str = ""         # email domain, '' for DM leads
     phone: str = ""
     has_website: bool = False
@@ -133,16 +135,21 @@ def load_all() -> tuple[list[Lead], list[tuple[str, str]]]:
 
         email = master_registry.norm_email(row.get("Email Address"))
         handle = str(row.get("Instagram") or "").strip()
+        phone = master_registry.norm_phone(row.get("Phone Number"))
         business = str(row.get("Business Name") or "").strip()
 
-        if email:
-            channel, identifier, domain = config.CHANNEL_EMAIL, email, _domain(email)
-        elif handle:
+        if handle:
             channel, identifier, domain = config.CHANNEL_INSTAGRAM, handle, ""
+        elif email:
+            channel, identifier, domain = config.CHANNEL_EMAIL, email, _domain(email)
+        elif len(phone) == 10:
+            channel, identifier, domain = config.CHANNEL_WHATSAPP, phone, ""
         else:
-            continue  # phone-only: no channel we're willing to use
+            continue  # no usable contact channel at all
 
-        reason = rejection_reason(business, identifier, domain)
+        # Purge on the email domain even when the chosen channel isn't email —
+        # a DM to an enterprise or a competitor is just as pointless.
+        reason = rejection_reason(business, identifier, _domain(email))
         if reason:
             rejected.append((identifier, reason))
             continue
@@ -153,6 +160,7 @@ def load_all() -> tuple[list[Lead], list[tuple[str, str]]]:
             identifier=identifier,
             business=clean_business(business),
             category=str(row.get("Category") or "").strip(),
+            lead_type=str(row.get("Lead Type") or "").strip(),
             domain=domain,
             phone=str(row.get("Phone Number") or "").strip(),
             has_website=master_registry.is_true(row.get("Has_Website")),

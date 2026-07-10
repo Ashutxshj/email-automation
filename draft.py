@@ -14,6 +14,8 @@ draft #1 and every lead after the first would be blocked, so each lead tries the
 skeletons in a rotated order and keeps the first that clears the threshold.
 """
 
+import re
+
 import config
 
 _EMAIL_SKELETONS = [
@@ -153,6 +155,114 @@ def validate(body: str, channel: str) -> None:
     words = len(body.split())
     if words > cap:
         raise DraftError(f"{words} words exceeds the {cap}-word cap for {channel}")
+
+
+# --- Gemini-drafted messages -------------------------------------------------
+
+# "4.8 stars" / "4.8-star" / "rated 4.8" and "732 reviews" / "900+ reviews" /
+# "732 five-star reviews" claims. Any such number in a draft must equal the
+# row's Rating / Reviews exactly — a plausible-but-wrong number is worse than
+# no number.
+_STARS_RE = re.compile(r"(\d+(?:\.\d+)?)[ -]stars?\b", re.I)
+_RATED_RE = re.compile(r"\brated\s+(\d+(?:\.\d+)?)\b", re.I)
+_REVIEWS_RE = re.compile(r"([\d,]+)\+?\s+(?:[\w'-]+\s+)?reviews?\b", re.I)
+
+# Language that implies you SAW a website. Allowed when they have one; a lead
+# with no website told "your site looks dated" disqualifies you instantly.
+_SITE_VISIT_PHRASES = (
+    "visited your", "had a look at your", "looked at your", "checked your",
+    "saw your site", "saw your website", "your site loads", "your website loads",
+    "your site looks", "your website looks", "your site is", "your website is",
+    "your current site", "your current website", "your existing site",
+    "your existing website", "your homepage", "on your site", "on your website",
+)
+
+
+def _same_number(claimed: str, actual) -> bool:
+    try:
+        return abs(float(str(claimed).replace(",", "")) - float(actual)) < 1e-9
+    except (TypeError, ValueError):
+        return False
+
+
+def _mentions_specifics(lead, body: str) -> bool:
+    """Does the body cite at least one concrete fact from the row?"""
+    lowered = body.lower()
+    if lead.rating and any(_same_number(m.group(1), lead.rating)
+                           for m in _STARS_RE.finditer(body)):
+        return True
+    if lead.reviews and (f"{lead.reviews:,}" in body or str(lead.reviews) in body):
+        return True
+    if any(len(tok) > 3 and tok in lowered
+           for tok in (lead.category or "").lower().split()):
+        return True
+    for bullet in lead.bullets:
+        distinctive = [w for w in re.findall(r"[a-z]{5,}", bullet.lower())
+                       if w in lowered]
+        if len(distinctive) >= 2:
+            return True
+    return False
+
+
+def validate_llm(lead, subject: str, body: str) -> None:
+    """Hard rules for a Gemini draft. Raise rather than trust the model."""
+    haystack = f"{subject}\n{body}".lower()
+    for bad in config.FORBIDDEN_SUBSTRINGS:
+        if bad.lower() in haystack:
+            raise DraftError(f"contains forbidden substring {bad!r}")
+
+    if lead.channel == config.CHANNEL_EMAIL:
+        words = len(body.split())
+        if words > config.LLM_EMAIL_MAX_WORDS:
+            raise DraftError(f"{words} words exceeds the "
+                             f"{config.LLM_EMAIL_MAX_WORDS}-word email cap")
+        if words < config.LLM_EMAIL_MIN_WORDS:
+            raise DraftError(f"{words} words is a stub, not an email")
+        if not subject.strip():
+            raise DraftError("email draft has no subject")
+        if "\n" in subject or len(subject.split()) > 6:
+            raise DraftError(f"subject {subject!r} should be a few plain words")
+    else:
+        if "\n" in body.strip():
+            raise DraftError("DM/WhatsApp message must be a single line")
+        if len(body) > config.ONE_LINER_MAX_CHARS:
+            raise DraftError(f"{len(body)} chars exceeds the "
+                             f"{config.ONE_LINER_MAX_CHARS}-char one-liner cap")
+
+    text = f"{subject}\n{body}"  # numbers in the subject count too
+    for pattern in (_STARS_RE, _RATED_RE):
+        for match in pattern.finditer(text):
+            if not lead.rating or not _same_number(match.group(1), lead.rating):
+                raise DraftError(f"claims '{match.group(0)}' but the row says "
+                                 f"rating={lead.rating or 'unknown'}")
+    for match in _REVIEWS_RE.finditer(text):
+        if not lead.reviews or not _same_number(match.group(1), lead.reviews):
+            raise DraftError(f"claims '{match.group(0)}' but the row says "
+                             f"reviews={lead.reviews or 'unknown'}")
+
+    if not lead.has_website:
+        hit = next((p for p in _SITE_VISIT_PHRASES if p in haystack), None)
+        if hit:
+            raise DraftError(f"implies you saw a website ('{hit}') but this "
+                             "business has none")
+
+    if not _mentions_specifics(lead, body):
+        raise DraftError("cites no concrete fact about this business "
+                         "(rating, reviews, category or a bullet)")
+
+
+def compose_message(lead, subject: str, body: str) -> str:
+    """The exact text for the Message cell — what a human copies and pastes.
+
+    Boilerplate is appended HERE, deterministically, never by Gemini: that keeps
+    ledger._comparable()'s boilerplate stripping exact.
+    """
+    if lead.channel == config.CHANNEL_EMAIL:
+        return (f"Subject: {subject}\n\n{body}\n\n"
+                f"{config.SIGNATURE}\n\n{config.EMAIL_OPTOUT}")
+    if config.ONE_LINER_INCLUDE_OPTOUT:
+        return f"{body} {config.DM_OPTOUT}"
+    return body
 
 
 def _render(lead, skeleton: str, bullet: str) -> str:
