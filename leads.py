@@ -100,7 +100,7 @@ def rejection_reason(business: str, identifier: str, domain: str) -> str | None:
         return f"sells tech/marketing services (matched '{kw}')"
     city = _out_of_area(business, domain)
     if city:
-        return f"outside Delhi NCR (names '{city}')"
+        return f"outside the service area (names '{city}')"
     return None
 
 

@@ -86,18 +86,21 @@ EXCLUDED_KEYWORDS = [
     "app develop", "graphic design",
 ]
 
-# Geography gate. NOTE: we do NOT require an NCR city keyword to be present —
-# most legitimate NCR domains (agargca.com, capulkit.com) name no city at all,
-# so requiring one would reject nearly every real lead. Instead we reject
-# domains/names that positively name a city outside the service area. This is
-# what catches info@dentalcareudaipur.com.
-OUT_OF_AREA_CITIES = [
-    "udaipur", "mumbai", "pune", "jaipur", "bangalore", "bengaluru", "chennai",
-    "kolkata", "hyderabad", "ahmedabad", "surat", "lucknow", "indore", "bhopal",
-    "nagpur", "kanpur", "patna", "chandigarh", "dehradun", "kochi", "goa",
-    "coimbatore", "vizag", "guwahati", "ranchi", "raipur", "varanasi",
-    "gorakhpur", "amritsar", "ludhiana", "agra", "kanpur", "mysore",
-]
+# Geography gate. The service area is INDIA, not Delhi NCR, so this list is
+# empty: a Chennai bakery and a Noida dentist are both leads. A website is built
+# and delivered remotely, so the only thing geography ever gated was whether you
+# could drive to them -- which was never the job.
+#
+# This used to name ~30 Indian cities (mumbai, pune, chennai, hyderabad, patna,
+# goa, amritsar, ...) and purged any lead whose name or domain mentioned one. It
+# was deleting real, contactable, paying-customer leads on nothing more than a
+# substring of their own name, and it fought the collectors directly: leeds now
+# sweeps Bengaluru, Mumbai, Pune, Hyderabad and Chennai for OSM leads, and this
+# list threw every one of them away after they were collected.
+#
+# Kept as a hook rather than deleted: the mechanism is the right place to reject
+# a genuinely unreachable market if one ever appears. Nothing in India is that.
+OUT_OF_AREA_CITIES: list[str] = []
 
 # --- Deliverability --------------------------------------------------------
 

@@ -174,12 +174,11 @@ class GeminiClient:
                     "rarer than it sounds.",
                 ]
                 middles = [
-                    "I build simple, fast websites for small businesses around "
-                    "Delhi NCR, and a business with that kind of reputation "
+                    "I build simple, fast websites for small businesses across "
+                    "India, and a business with that kind of reputation "
                     "usually gets real mileage out of one.",
-                    "I design websites for local businesses here in Delhi, and "
-                    "yours is exactly the kind that a clean site tends to help "
-                    "most.",
+                    "I'm a web designer based in Delhi, and yours is exactly "
+                    "the kind of business a clean site tends to help most.",
                     "Websites for local businesses are what I build, and I'd "
                     "happily sketch what one for you could look like first.",
                     "My work is building sites for businesses like yours, and "
@@ -204,8 +203,8 @@ class GeminiClient:
                     f"{fact} —",
                 ]
                 pitches = [
-                    f"I build websites for {category}s in Delhi",
-                    "I design simple sites for local businesses here",
+                    f"I build websites for {category}s",
+                    "I design simple sites for small businesses",
                     "making websites for businesses like yours is what I do",
                     "I turn listings like that into proper websites",
                     "a clean one-page site could catch all that traffic, and I "

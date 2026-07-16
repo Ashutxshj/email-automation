@@ -21,15 +21,15 @@ import config
 _EMAIL_SKELETONS = [
     ("Hi,\n\n"
      "I was looking at {business} online and noticed {fact}.\n\n"
-     "I build and rebuild websites for small businesses around Delhi NCR. That "
-     "particular thing is usually a day's work. Happy to tell you what else I'd "
-     "change even if you never hire me.\n\n"
+     "I'm a web designer based in Delhi and I rebuild sites for small businesses "
+     "across India. That particular thing is usually a day's work. Happy to tell "
+     "you what else I'd change even if you never hire me.\n\n"
      "Worth a short reply?\n\n"
      "{signature}\n\n"
      "{optout}"),
     ("Hello,\n\n"
      "Quick note about the {business} website — {fact}.\n\n"
-     "I'm a web designer here in Delhi. I'd rather point it out than let it keep "
+     "I'm a web designer based in Delhi. I'd rather point it out than let it keep "
      "costing you visitors. If it's useful I can walk you through what I'd fix "
      "first, no charge for the conversation.\n\n"
      "Any interest?\n\n"
@@ -46,9 +46,9 @@ _EMAIL_SKELETONS = [
      "{optout}"),
     ("Hi there,\n\n"
      "I had a look at the {business} site today. {fact_capitalised}.\n\n"
-     "I design websites for local businesses in and around Delhi. Small fixes "
-     "like this one usually pay for themselves quickly. I can show you what a "
-     "rebuild would look like before you commit to anything.\n\n"
+     "I design websites for small businesses across India. Small fixes like this "
+     "one usually pay for themselves quickly. I can show you what a rebuild would "
+     "look like before you commit to anything.\n\n"
      "Shall I?\n\n"
      "{signature}\n\n"
      "{optout}"),
@@ -60,15 +60,16 @@ _EMAIL_SKELETONS = [
 _EMAIL_NO_SITE_SKELETONS = [
     ("Hi,\n\n"
      "I was looking up {business} and noticed {fact}.\n\n"
-     "I build websites for small businesses around Delhi NCR. When people search "
-     "for a {category} nearby, they tend to land on whoever has one. Happy to "
-     "show you what yours could look like before you commit to anything.\n\n"
+     "I'm a web designer based in Delhi and I build sites for small businesses "
+     "across India. When people search for a {category} nearby, they tend to "
+     "land on whoever has one. Happy to show you what yours could look like "
+     "before you commit to anything.\n\n"
      "Worth a short reply?\n\n"
      "{signature}\n\n"
      "{optout}"),
     ("Hello,\n\n"
      "Quick note about {business} — {fact}.\n\n"
-     "I'm a web designer here in Delhi. A simple site would let you show timings, "
+     "I'm a web designer based in Delhi. A simple site would let you show timings, "
      "prices and directions to the people already looking for you. I can mock one "
      "up so you can see it first, no charge for that.\n\n"
      "Any interest?\n\n"
@@ -99,7 +100,7 @@ _DM_SKELETONS = [
      "{optout}"),
     ("Hi! {fact_capitalised} — that's the first thing I noticed about "
      "{business}.\n\n"
-     "I'm a web designer in Delhi. Happy to mock something up so you can see it "
+     "I'm a web designer based in Delhi. Happy to mock something up so you can see it "
      "before deciding anything.\n\n"
      "Worth a look?\n\n"
      "{optout}"),

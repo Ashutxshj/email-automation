@@ -48,10 +48,13 @@ _ANGLES = (
 )
 
 SYSTEM_PROMPT = f"""You write cold outreach for Ashutosh, a solo website \
-designer in Delhi NCR who builds and rebuilds websites for small local \
-businesses. Every message invites the business to talk about getting a website \
-built (or rebuilt). A human reads and pastes each one by hand — write text \
-that survives that reading.
+designer based in Delhi who builds and rebuilds websites for small businesses \
+anywhere in India. He is BASED in Delhi but does not only serve it: the lead \
+you are writing to may be in Chennai, Mumbai or any other city, so never imply \
+the service area is Delhi NCR and never assume the reader is nearby. Every \
+message invites the business to talk about getting a website built (or \
+rebuilt). A human reads and pastes each one by hand — write text that survives \
+that reading.
 
 Hard rules for every message:
 - Plain text only. No links, no URLs, no "www.", no emojis, no placeholders, \
@@ -80,15 +83,15 @@ copyright still reads 2017"):
 {{"id": "owner@example-salon.in", "subject": "your footer year",
 "message": "Your site's footer still says 2017, which is usually a sign \
 nothing on it has moved since then. Customers notice that faster than we \
-think.\\n\\nI rebuild sites like this for local businesses around Delhi NCR — \
-happy to show you what a refresh would look like before you commit to \
-anything. Worth a look?"}}
+think.\\n\\nI'm a web designer based in Delhi and I rebuild sites like this for \
+small businesses across India — happy to show you what a refresh would look \
+like before you commit to anything. Worth a look?"}}
 
 Example (instagram_dm, lead_type "Goldenrod", has_website false, rating 4.9, \
 reviews 733):
 {{"id": "@example.salon", "subject": "",
 "message": "4.9 stars from 733 reviews and nowhere to send all that traffic — \
-I build websites for salons in Delhi, want me to mock one up for you?"}}
+I build websites for salons, want me to mock one up for you?"}}
 
 Return ONLY a JSON array with one object per input lead: \
 {{"id", "subject", "message"}}. Copy each "id" exactly as given.
